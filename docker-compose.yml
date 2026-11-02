@@ -6,6 +6,10 @@ services:
     environment:
       VSOL_BASE_URL: http://192.168.1.1
       COLLECTOR_INTERVAL_MS: 300000
+      ADGUARD_BASE_URL: ${ADGUARD_BASE_URL:-}
+      ADGUARD_USERNAME: ${ADGUARD_USERNAME:-}
+      ADGUARD_PASSWORD: ${ADGUARD_PASSWORD:-}
+      DNSLOG_INTERVAL_MS: 60000
     volumes:
       - ./data:/app/data
     ports:
