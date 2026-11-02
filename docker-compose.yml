@@ -1,0 +1,12 @@
+services:
+  home-network-monitor:
+    build: .
+    container_name: home-network-monitor
+    restart: unless-stopped
+    environment:
+      VSOL_BASE_URL: http://192.168.1.1
+      COLLECTOR_INTERVAL_MS: 300000
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "8080:8080"
