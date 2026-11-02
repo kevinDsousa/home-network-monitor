@@ -3,6 +3,8 @@ package com.homenetworkmonitor.client;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import com.homenetworkmonitor.models.dto.DnsQueryDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +27,7 @@ import java.util.List;
 @Component
 public class AdguardQueryLogClient {
 
+    private static final Logger log = LoggerFactory.getLogger(AdguardQueryLogClient.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -44,6 +47,7 @@ public class AdguardQueryLogClient {
 
     public List<DnsQueryDTO> fetchRecentQueries(int limit) {
         if (baseUrl == null || baseUrl.isBlank()) {
+            log.warn("adguard.base-url não configurado; ingestão de DNS desligada");
             return List.of();
         }
 
@@ -58,6 +62,7 @@ public class AdguardQueryLogClient {
 
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
             if (response.statusCode() != 200) {
+                log.warn("AdGuard Home respondeu HTTP {} em {}/control/querylog", response.statusCode(), baseUrl);
                 return List.of();
             }
 
@@ -78,6 +83,7 @@ public class AdguardQueryLogClient {
                 result.add(new DnsQueryDTO(clientIp, domain, blocked, queriedAt));
             }
         } catch (Exception e) {
+            log.warn("Falha ao consultar o AdGuard Home em {}: {}", baseUrl, e.toString());
             return List.of();
         }
         return result;

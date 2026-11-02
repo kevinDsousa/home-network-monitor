@@ -2,11 +2,15 @@ package com.homenetworkmonitor.scheduler;
 
 import com.homenetworkmonitor.agent.DeviceCollectorAgent;
 import com.homenetworkmonitor.service.DeviceInventoryService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
 public class CollectorScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(CollectorScheduler.class);
 
     private final DeviceCollectorAgent collectorAgent;
     private final DeviceInventoryService inventoryService;
@@ -18,6 +22,8 @@ public class CollectorScheduler {
 
     @Scheduled(fixedDelayString = "${collector.interval-ms:300000}")
     public void run() {
-        inventoryService.persist(collectorAgent.collectAll());
+        var devices = collectorAgent.collectAll();
+        inventoryService.persist(devices);
+        log.info("Coleta de dispositivos concluída: {} dispositivos", devices.size());
     }
 }
