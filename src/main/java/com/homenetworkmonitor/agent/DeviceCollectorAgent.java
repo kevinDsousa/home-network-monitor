@@ -1,8 +1,10 @@
 package com.homenetworkmonitor.agent;
 
+import com.homenetworkmonitor.models.dto.DeviceAssociationDTO;
 import com.homenetworkmonitor.provider.DeviceProvider;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -14,15 +16,11 @@ public class DeviceCollectorAgent {
         this.providers = providers;
     }
 
-    public void collectAll() {
-
+    public List<DeviceAssociationDTO> collectAll() {
+        List<DeviceAssociationDTO> result = new ArrayList<>();
         for (DeviceProvider provider : providers) {
-
-            System.out.println("Coletando: " + provider.getName());
-
-            var devices = provider.collect();
-
-            devices.forEach(System.out::println);
+            result.addAll(provider.collect());
         }
+        return result;
     }
 }

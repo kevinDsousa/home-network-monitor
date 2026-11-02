@@ -1,6 +1,18 @@
 spring:
   application:
     name: home-network-monitor
+  datasource:
+    url: jdbc:h2:file:./data/home-network-monitor;AUTO_SERVER=TRUE
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
 
 vsol:
   base-url: http://192.168.1.1
+
+collector:
+  interval-ms: 300000
+
