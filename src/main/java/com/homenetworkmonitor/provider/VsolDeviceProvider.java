@@ -5,6 +5,8 @@ import com.homenetworkmonitor.models.enums.WifiBand;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +27,7 @@ import java.util.regex.Pattern;
 @Component
 public class VsolDeviceProvider implements DeviceProvider {
 
+    private static final Logger log = LoggerFactory.getLogger(VsolDeviceProvider.class);
     private static final Pattern DHCP_FIELD = Pattern.compile("new it\\(\"([a-zA-Z]+)\",\\s*\"([^\"]*)\"\\)");
 
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -130,8 +133,12 @@ public class VsolDeviceProvider implements DeviceProvider {
                     .GET()
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() != 200) {
+                log.warn("VSOL respondeu HTTP {} em {}{}", response.statusCode(), baseUrl, path);
+            }
             return response.body() != null ? response.body() : "";
         } catch (Exception e) {
+            log.warn("Falha ao acessar {}{}: {}", baseUrl, path, e.toString());
             return "";
         }
     }
