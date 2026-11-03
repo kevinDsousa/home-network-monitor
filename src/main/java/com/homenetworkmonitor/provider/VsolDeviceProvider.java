@@ -21,12 +21,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Lê os dados de dispositivos conectados direto do painel web do VSOL V2802AC.
- * As páginas status_ethernet_info.asp (DHCP) e status_wlan_info_11n.asp (associação Wi-Fi)
- * exigem sessão autenticada; o VSOL rastreia a sessão pelo IP de origem (sem cookie),
- * então basta logar uma vez e as requisições seguintes já são aceitas.
- */
 @Component
 public class VsolDeviceProvider implements DeviceProvider {
 

@@ -18,8 +18,6 @@ vsol:
 collector:
   interval-ms: 300000
 
-# adguard.base-url fica vazio por padrão (integração desligada) até ser
-# definido via variável de ambiente ADGUARD_BASE_URL no deploy real.
 adguard:
   base-url: ${ADGUARD_BASE_URL:}
   username: ${ADGUARD_USERNAME:}

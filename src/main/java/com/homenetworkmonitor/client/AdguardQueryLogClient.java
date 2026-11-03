@@ -20,10 +20,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
-/**
- * Lê o log de consultas DNS do AdGuard Home via a API REST (GET /control/querylog),
- * autenticada por Basic Auth com o usuário/senha de admin configurado no add-on.
- */
 @Component
 public class AdguardQueryLogClient {
 
