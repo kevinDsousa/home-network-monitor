@@ -5,6 +5,8 @@ services:
     restart: unless-stopped
     environment:
       VSOL_BASE_URL: http://192.168.1.1
+      VSOL_USERNAME: ${VSOL_USERNAME:-}
+      VSOL_PASSWORD: ${VSOL_PASSWORD:-}
       COLLECTOR_INTERVAL_MS: 300000
       ADGUARD_BASE_URL: ${ADGUARD_BASE_URL:-}
       ADGUARD_USERNAME: ${ADGUARD_USERNAME:-}

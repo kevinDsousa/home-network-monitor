@@ -14,6 +14,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -22,13 +24,17 @@ import java.util.regex.Pattern;
 /**
  * Lê os dados de dispositivos conectados direto do painel web do VSOL V2802AC.
  * As páginas status_ethernet_info.asp (DHCP) e status_wlan_info_11n.asp (associação Wi-Fi)
- * respondem sem exigir login nesse firmware.
+ * exigem sessão autenticada; o VSOL rastreia a sessão pelo IP de origem (sem cookie),
+ * então basta logar uma vez e as requisições seguintes já são aceitas.
  */
 @Component
 public class VsolDeviceProvider implements DeviceProvider {
 
     private static final Logger log = LoggerFactory.getLogger(VsolDeviceProvider.class);
     private static final Pattern DHCP_FIELD = Pattern.compile("new it\\(\"([a-zA-Z]+)\",\\s*\"([^\"]*)\"\\)");
+    private static final Pattern CHECK_CODE = Pattern.compile("check_code'\\)\\.value='([^']+)'");
+    private static final Pattern CSRF_TOKEN = Pattern.compile("name='csrftoken' value='([^']+)'");
+    private static final int MAX_ATTEMPTS = 3;
 
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
@@ -36,9 +42,15 @@ public class VsolDeviceProvider implements DeviceProvider {
             .build();
 
     private final String baseUrl;
+    private final String username;
+    private final String password;
 
-    public VsolDeviceProvider(@Value("${vsol.base-url:http://192.168.1.1}") String baseUrl) {
+    public VsolDeviceProvider(@Value("${vsol.base-url:http://192.168.1.1}") String baseUrl,
+                               @Value("${vsol.username:}") String username,
+                               @Value("${vsol.password:}") String password) {
         this.baseUrl = baseUrl;
+        this.username = username;
+        this.password = password;
     }
 
     @Override
@@ -127,20 +139,98 @@ public class VsolDeviceProvider implements DeviceProvider {
     }
 
     private String fetchBody(String path) {
+        boolean triedLogin = false;
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+            try {
+                HttpRequest request = HttpRequest.newBuilder()
+                        .uri(URI.create(baseUrl + path))
+                        .timeout(Duration.ofSeconds(5))
+                        .GET()
+                        .build();
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 200) {
+                    return response.body() != null ? response.body() : "";
+                }
+                if (response.statusCode() == 302 && !triedLogin) {
+                    log.info("VSOL exigiu login em {}{}, autenticando", baseUrl, path);
+                    triedLogin = true;
+                    login();
+                    continue;
+                }
+                log.warn("VSOL respondeu HTTP {} em {}{} (tentativa {}/{})",
+                        response.statusCode(), baseUrl, path, attempt, MAX_ATTEMPTS);
+            } catch (Exception e) {
+                log.warn("Falha ao acessar {}{} (tentativa {}/{}): {}",
+                        baseUrl, path, attempt, MAX_ATTEMPTS, e.toString());
+            }
+            sleepBeforeRetry();
+        }
+        return "";
+    }
+
+    private void login() {
+        if (username == null || username.isBlank()) {
+            log.warn("vsol.username não configurado; não é possível autenticar");
+            return;
+        }
         try {
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(baseUrl + path))
+            HttpRequest loginPage = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/admin/login.asp"))
                     .timeout(Duration.ofSeconds(5))
                     .GET()
                     .build();
-            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() != 200) {
-                log.warn("VSOL respondeu HTTP {} em {}{}", response.statusCode(), baseUrl, path);
+            HttpResponse<String> pageResponse = httpClient.send(loginPage, HttpResponse.BodyHandlers.ofString());
+            String page = pageResponse.body() != null ? pageResponse.body() : "";
+
+            String code = extractGroup(CHECK_CODE, page);
+            String csrf = extractGroup(CSRF_TOKEN, page);
+            if (code == null || csrf == null) {
+                log.warn("Não foi possível extrair código de verificação/csrftoken da página de login do VSOL");
+                return;
             }
-            return response.body() != null ? response.body() : "";
+
+            String form = "username=" + urlEncode(username)
+                    + "&psd=" + urlEncode(password)
+                    + "&sec_lang=0"
+                    + "&verification_code=" + urlEncode(code)
+                    + "&csrftoken=" + urlEncode(csrf)
+                    + "&loginSelinit=&ismobile=";
+
+            HttpRequest loginPost = HttpRequest.newBuilder()
+                    .uri(URI.create(baseUrl + "/boaform/admin/formLogin"))
+                    .timeout(Duration.ofSeconds(5))
+                    .header("Content-Type", "application/x-www-form-urlencoded")
+                    .POST(HttpRequest.BodyPublishers.ofString(form))
+                    .build();
+            HttpResponse<String> loginResponse = httpClient.send(loginPost, HttpResponse.BodyHandlers.ofString());
+            String responseBody = loginResponse.body() != null ? loginResponse.body() : "";
+
+            boolean alreadyLoggedIn = responseBody.contains("você se logou");
+            boolean failed = responseBody.contains("ERRO") && !alreadyLoggedIn;
+            if (failed) {
+                log.warn("Falha no login do VSOL: {}", responseBody.replaceAll("\\s+", " ").trim());
+            } else {
+                log.info("Login no VSOL confirmado");
+            }
         } catch (Exception e) {
-            log.warn("Falha ao acessar {}{}: {}", baseUrl, path, e.toString());
-            return "";
+            log.warn("Falha ao tentar logar no VSOL: {}", e.toString());
+        }
+    }
+
+    private static String extractGroup(Pattern pattern, String text) {
+        Matcher matcher = pattern.matcher(text);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private static String urlEncode(String value) {
+        return URLEncoder.encode(value != null ? value : "", StandardCharsets.UTF_8);
+    }
+
+    private static void sleepBeforeRetry() {
+        try {
+            Thread.sleep(500);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
     }
 

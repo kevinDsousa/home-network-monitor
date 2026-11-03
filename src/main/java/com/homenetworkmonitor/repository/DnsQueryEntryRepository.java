@@ -12,6 +12,4 @@ public interface DnsQueryEntryRepository extends JpaRepository<DnsQueryEntry, UU
     Optional<DnsQueryEntry> findTopByOrderByQueriedAtDesc();
 
     List<DnsQueryEntry> findTop200ByOrderByQueriedAtDesc();
-
-    List<DnsQueryEntry> findTop200ByDevice_MacOrderByQueriedAtDesc(String mac);
 }

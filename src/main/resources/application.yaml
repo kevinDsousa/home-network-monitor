@@ -12,6 +12,8 @@ spring:
 
 vsol:
   base-url: http://192.168.1.1
+  username: ${VSOL_USERNAME:}
+  password: ${VSOL_PASSWORD:}
 
 collector:
   interval-ms: 300000
